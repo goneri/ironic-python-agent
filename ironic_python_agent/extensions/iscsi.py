@@ -24,6 +24,7 @@ try:
 except ImportError:
     import rtslib as rtslib_fb
 
+from ironic_lib import disk_utils
 from ironic_python_agent import errors
 from ironic_python_agent.extensions import base
 from ironic_python_agent import hardware
@@ -135,6 +136,9 @@ def clean_up(device):
 
 
 class ISCSIExtension(base.BaseAgentExtension):
+    def __init__(self, agent):
+        base.BaseAgentExtension.__init__(self, agent)
+
     @base.sync_command('start_iscsi_target')
     def start_iscsi_target(self, iqn=None):
         """Expose the disk as an ISCSI target."""
@@ -143,6 +147,8 @@ class ISCSIExtension(base.BaseAgentExtension):
             iqn = 'iqn.2008-10.org.openstack:%s' % uuidutils.generate_uuid()
 
         device = hardware.dispatch_to_managers('get_os_install_device')
+        disk_utils.destroy_disk_metadata(device, self.agent.get_node_uuid())
+
         LOG.debug("Starting ISCSI target with iqn %(iqn)s on device "
                   "%(device)s", {'iqn': iqn, 'device': device})
 

@@ -20,21 +20,29 @@ import mock
 from oslo_concurrency import processutils
 from oslotest import base as test_base
 
+from ironic_lib import disk_utils
 from ironic_python_agent import errors
 from ironic_python_agent.extensions import iscsi
 from ironic_python_agent import hardware
 from ironic_python_agent import utils
 
 
+class FakeAgent(object):
+    def get_node_uuid(self):
+        return 'my_node_uuid'
+
+
 @mock.patch.object(hardware, 'dispatch_to_managers')
 @mock.patch.object(utils, 'execute')
 @mock.patch.object(iscsi.rtslib_fb, 'RTSRoot',
                    mock.Mock(side_effect=iscsi.rtslib_fb.RTSLibError()))
+@mock.patch.object(processutils, 'execute',
+                   mock.Mock(return_value=(0, 0)))
 class TestISCSIExtensionTgt(test_base.BaseTestCase):
 
     def setUp(self):
         super(TestISCSIExtensionTgt, self).setUp()
-        self.agent_extension = iscsi.ISCSIExtension()
+        self.agent_extension = iscsi.ISCSIExtension(FakeAgent())
         self.fake_dev = '/dev/fake'
         self.fake_iqn = 'iqn-fake'
 
@@ -71,6 +79,7 @@ class TestISCSIExtensionTgt(test_base.BaseTestCase):
         self.assertRaises(errors.ISCSIError,
                           self.agent_extension.start_iscsi_target,
                           iqn=self.fake_iqn)
+
         expected = [mock.call('tgtd'),
                     mock.call('tgtadm', '--lld', 'iscsi', '--mode', 'target',
                               '--op', 'show', attempts=10)]
@@ -102,11 +111,12 @@ _ORIG_UTILS = iscsi.rtslib_fb.utils
 @mock.patch.object(hardware, 'dispatch_to_managers')
 # Don't mock the utils module, as it contains exceptions
 @mock.patch.object(iscsi, 'rtslib_fb', utils=_ORIG_UTILS)
+@mock.patch.object(disk_utils, 'destroy_disk_metadata', mock.Mock())
 class TestISCSIExtensionLIO(test_base.BaseTestCase):
 
     def setUp(self):
         super(TestISCSIExtensionLIO, self).setUp()
-        self.agent_extension = iscsi.ISCSIExtension()
+        self.agent_extension = iscsi.ISCSIExtension(FakeAgent())
         self.fake_dev = '/dev/fake'
         self.fake_iqn = 'iqn-fake'
 
@@ -162,7 +172,7 @@ class TestISCSIExtensionCleanUp(test_base.BaseTestCase):
 
     def setUp(self):
         super(TestISCSIExtensionCleanUp, self).setUp()
-        self.agent_extension = iscsi.ISCSIExtension()
+        self.agent_extension = iscsi.ISCSIExtension(None)
         self.fake_dev = '/dev/fake'
         self.fake_iqn = 'iqn-fake'
 
